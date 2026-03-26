@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Item, Context, ItemType } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import ItemCard from './ItemCard'
@@ -25,6 +25,10 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [showInput, setShowInput] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [pullY, setPullY] = useState(0)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const touchStartY = useRef(0)
+  const PULL_THRESHOLD = 70
 
   const fetchItems = useCallback(async () => {
     const res = await fetch('/api/items')
@@ -43,6 +47,28 @@ export default function Dashboard() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [fetchItems])
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      touchStartY.current = e.touches[0].clientY
+    }
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY.current === 0) return
+    const delta = e.touches[0].clientY - touchStartY.current
+    if (delta > 0) setPullY(Math.min(delta * 0.5, PULL_THRESHOLD))
+  }
+
+  const handleTouchEnd = async () => {
+    if (pullY >= PULL_THRESHOLD) {
+      setIsRefreshing(true)
+      await fetchItems()
+      setIsRefreshing(false)
+    }
+    setPullY(0)
+    touchStartY.current = 0
+  }
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -75,7 +101,19 @@ export default function Dashboard() {
   const pendingTodos = items.filter((i) => i.type === 'todo' && !i.is_done).length
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div
+      className="min-h-screen bg-gray-50 pb-24"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull-to-refresh 인디케이터 */}
+      <div
+        className="flex justify-center items-center overflow-hidden transition-all duration-200"
+        style={{ height: pullY > 0 ? pullY : 0 }}
+      >
+        <div className={`w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full ${isRefreshing || pullY >= PULL_THRESHOLD ? 'animate-spin border-gray-700' : ''}`} />
+      </div>
       {/* 헤더 */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-20">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
