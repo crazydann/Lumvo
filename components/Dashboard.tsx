@@ -50,20 +50,15 @@ export default function Dashboard() {
   }
 
   const handleMemoSubmit = async (text: string) => {
-    const analysisRes = await fetch('/api/analyze', {
+    const res = await fetch('/api/memos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ raw_text: text }),
     })
-    const analysis = await analysisRes.json()
-    await fetch('/api/memos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ raw_text: text, analysis }),
-    })
+    const data = await res.json()
     fetchItems()
     setShowInput(false)
-    showToast(`✅ ${analysis.items?.length ?? 0}개 항목으로 정리됐습니다`)
+    showToast(`✅ ${data.itemCount ?? 0}개 항목으로 정리됐습니다`)
   }
 
   const handleToggle = async (id: string, isDone: boolean) => {
