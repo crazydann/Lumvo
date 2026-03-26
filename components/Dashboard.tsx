@@ -23,6 +23,8 @@ export default function Dashboard() {
   const [items, setItems] = useState<Item[]>([])
   const [activeTab, setActiveTab] = useState<ItemType | 'all'>('all')
   const [isLoading, setIsLoading] = useState(true)
+  const [showInput, setShowInput] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
   const fetchItems = useCallback(async () => {
     const res = await fetch('/api/items')
@@ -33,35 +35,35 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchItems()
-
-    // 실시간 구독
     const channel = supabase
       .channel('items-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, () => {
         fetchItems()
       })
       .subscribe()
-
     return () => { supabase.removeChannel(channel) }
   }, [fetchItems])
 
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2500)
+  }
+
   const handleMemoSubmit = async (text: string) => {
-    // 1. AI 분석
     const analysisRes = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     })
     const analysis = await analysisRes.json()
-
-    // 2. 저장
     await fetch('/api/memos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ raw_text: text, analysis }),
     })
-
     fetchItems()
+    setShowInput(false)
+    showToast(`✅ ${analysis.items?.length ?? 0}개 항목으로 정리됐습니다`)
   }
 
   const handleToggle = async (id: string, isDone: boolean) => {
@@ -74,20 +76,17 @@ export default function Dashboard() {
   }
 
   const filteredItems = items.filter((item) => activeTab === 'all' || item.type === activeTab)
-
-  const getItemsByContext = (context: Context) =>
-    filteredItems.filter((item) => item.context === context)
-
+  const getItemsByContext = (context: Context) => filteredItems.filter((item) => item.context === context)
   const pendingTodos = items.filter((i) => i.type === 'todo' && !i.is_done).length
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-24">
       {/* 헤더 */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-20">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Lumvo</h1>
-            <p className="text-xs text-gray-400">개인 AI 비서</p>
+            <h1 className="text-lg font-bold text-gray-900 leading-none">Lumvo</h1>
+            <p className="text-xs text-gray-400 mt-0.5">개인 AI 비서</p>
           </div>
           {pendingTodos > 0 && (
             <span className="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">
@@ -97,20 +96,17 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* 메모 입력 */}
-        <MemoInput onSubmit={handleMemoSubmit} />
-
+      <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
         {/* 필터 탭 */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
           {TYPE_TABS.map((tab) => (
             <button
               key={tab.type}
               onClick={() => setActiveTab(tab.type)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
                 activeTab === tab.type
                   ? 'bg-gray-900 text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-400'
+                  : 'bg-white text-gray-600 border border-gray-200'
               }`}
             >
               {tab.label}
@@ -120,21 +116,21 @@ export default function Dashboard() {
 
         {/* 대시보드 */}
         {isLoading ? (
-          <div className="text-center py-20 text-gray-400">불러오는 중...</div>
+          <div className="text-center py-20 text-gray-400 text-sm">불러오는 중...</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
             {SECTIONS.map(({ context, label, icon }) => {
               const sectionItems = getItemsByContext(context)
               return (
                 <div key={context} className="bg-white rounded-2xl border border-gray-100 shadow-sm">
                   <div className="px-4 py-3 border-b border-gray-50 flex items-center gap-2">
-                    <span>{icon}</span>
-                    <h2 className="font-semibold text-gray-800">{label}</h2>
+                    <span className="text-base">{icon}</span>
+                    <h2 className="font-semibold text-gray-800 text-sm">{label}</h2>
                     <span className="ml-auto text-xs text-gray-400">{sectionItems.length}개</span>
                   </div>
                   <div className="p-2">
                     {sectionItems.length === 0 ? (
-                      <p className="text-center text-gray-300 text-sm py-8">항목 없음</p>
+                      <p className="text-center text-gray-300 text-sm py-6">항목 없음</p>
                     ) : (
                       sectionItems.map((item) => (
                         <ItemCard key={item.id} item={item} onToggle={handleToggle} />
@@ -147,6 +143,38 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {/* 하단 플로팅 메모 입력 시트 */}
+      {showInput && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-30"
+            onClick={() => setShowInput(false)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-40 bg-white rounded-t-3xl shadow-2xl p-4 pb-8">
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+            <MemoInput onSubmit={handleMemoSubmit} />
+          </div>
+        </>
+      )}
+
+      {/* 하단 플로팅 버튼 */}
+      {!showInput && (
+        <button
+          onClick={() => setShowInput(true)}
+          className="fixed bottom-6 right-6 z-30 w-14 h-14 bg-gray-900 text-white rounded-full shadow-lg flex items-center justify-center text-2xl active:scale-95 transition-transform"
+          aria-label="메모 추가"
+        >
+          +
+        </button>
+      )}
+
+      {/* 토스트 알림 */}
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-full shadow-lg whitespace-nowrap">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }
