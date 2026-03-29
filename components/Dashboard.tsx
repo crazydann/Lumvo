@@ -8,6 +8,7 @@ import MemoInput from './MemoInput'
 import BrainPanel from './BrainPanel'
 import MemoHistory from './MemoHistory'
 import PatternAlerts from './PatternAlerts'
+import QuickVoiceMemo from './QuickVoiceMemo'
 
 const SECTIONS: { context: Context; label: string; icon: string }[] = [
   { context: 'work', label: '업무', icon: '💼' },
@@ -203,15 +204,23 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* 하단 플로팅 버튼 */}
+      {/* 하단 FAB - 텍스트(+) + 음성(🎤) */}
       {!showInput && (
-        <button
-          onClick={() => setShowInput(true)}
-          className="fixed bottom-6 right-6 z-30 w-14 h-14 bg-gray-900 text-white rounded-full shadow-lg flex items-center justify-center text-2xl active:scale-95 transition-transform"
-          aria-label="메모 추가"
-        >
-          +
-        </button>
+        <div className="fixed bottom-6 right-6 z-30 flex flex-col items-center gap-3">
+          <QuickVoiceMemo
+            onSaved={(count) => {
+              fetchItems()
+              showToast(`✅ ${count}개 항목으로 정리됐습니다`)
+            }}
+          />
+          <button
+            onClick={() => setShowInput(true)}
+            className="w-14 h-14 bg-gray-900 text-white rounded-full shadow-lg flex items-center justify-center text-2xl active:scale-95 transition-transform"
+            aria-label="텍스트 메모"
+          >
+            +
+          </button>
+        </div>
       )}
 
       {/* 토스트 알림 */}
