@@ -5,6 +5,7 @@ import { Item, Context, ItemType } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import ItemCard from './ItemCard'
 import MemoInput from './MemoInput'
+import BrainPanel from './BrainPanel'
 
 const SECTIONS: { context: Context; label: string; icon: string }[] = [
   { context: 'work', label: '업무', icon: '💼' },
@@ -130,6 +131,9 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
+        {/* AI 브레인 */}
+        <BrainPanel />
+
         {/* 필터 탭 */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
           {TYPE_TABS.map((tab) => (
