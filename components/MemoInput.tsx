@@ -10,13 +10,20 @@ interface Props {
 export default function MemoInput({ onSubmit }: Props) {
   const [text, setText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async () => {
     if (!text.trim()) return
     setIsSubmitting(true)
-    await onSubmit(text.trim())
-    setText('')
-    setIsSubmitting(false)
+    setError(null)
+    try {
+      await onSubmit(text.trim())
+      setText('')
+    } catch (e) {
+      setError((e as Error).message ?? '저장 실패')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleTranscribed = (transcribedText: string) => {
@@ -28,12 +35,15 @@ export default function MemoInput({ onSubmit }: Props) {
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="메모를 입력하세요... (예: 김철수에게 제안서 메일 보내기, 내일 오후 2시 팀 미팅)"
+        placeholder="메모를 입력하세요... (예: 김철수에게 제안서 메일 보내기)"
         className="w-full h-24 text-gray-800 placeholder-gray-400 resize-none outline-none text-sm leading-relaxed"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && e.metaKey) handleSubmit()
         }}
       />
+      {error && (
+        <p className="text-xs text-red-500 mb-2">{error}</p>
+      )}
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
         <VoiceRecorder onTranscribed={handleTranscribed} />
         <button

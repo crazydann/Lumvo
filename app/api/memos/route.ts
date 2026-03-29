@@ -32,6 +32,13 @@ const SYSTEM_PROMPT = `당신은 개인 비서입니다. 사용자의 메모를 
 }
 due_date는 일정이 있을 경우만 포함하세요.`
 
+type AnalyzedItem = {
+  context: string
+  type: string
+  content: string
+  due_date?: string
+}
+
 export async function GET() {
   const { data, error } = await supabase
     .from('memos')
@@ -49,38 +56,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No text provided' }, { status: 400 })
   }
 
-  // 1. AI 분석 + 임베딩 병렬 생성
-  let items: { context: string; type: string; content: string; due_date?: string }[] = []
-  let memoEmbedding: number[] | null = null
-
-  const [analysisResult, embeddingResult] = await Promise.allSettled([
-    // AI 분류
-    openai.chat.completions.create({
+  // 1. AI 분석
+  let items: AnalyzedItem[] = []
+  try {
+    const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: raw_text },
       ],
       response_format: { type: 'json_object' },
-    }),
-    // 임베딩 생성
-    generateEmbedding(raw_text),
-  ])
+    })
 
-  if (analysisResult.status === 'fulfilled') {
-    const content = analysisResult.value.choices[0].message.content
-    if (content) {
-      const parsed = JSON.parse(content)
-      items = Array.isArray(parsed.items) ? parsed.items : []
-    }
-  } else {
-    console.error('AI analysis error:', analysisResult.reason)
-  }
+    const content = completion.choices?.[0]?.message?.content
+    if (!content) throw new Error('Empty AI response')
 
-  if (embeddingResult.status === 'fulfilled') {
-    memoEmbedding = embeddingResult.value
-  } else {
-    console.error('Embedding error:', embeddingResult.reason)
+    const parsed = JSON.parse(content)
+    items = Array.isArray(parsed.items) ? parsed.items : []
+    console.log(`[memos] AI analyzed ${items.length} items from: "${raw_text.slice(0, 50)}"`)
+  } catch (e) {
+    console.error('[memos] AI analysis failed:', e)
+    // AI 실패해도 메모 자체는 저장 (items 없이)
   }
 
   // 2. 메모 저장
@@ -91,11 +87,11 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (memoError) {
-    console.error('Memo insert error:', memoError)
+    console.error('[memos] Memo insert error:', memoError)
     return NextResponse.json({ error: memoError.message }, { status: 500 })
   }
 
-  // 3. 항목 저장 + 임베딩 저장
+  // 3. 항목 저장
   if (items.length > 0) {
     const itemsToInsert = items.map((item) => ({
       memo_id: memo.id,
@@ -111,20 +107,20 @@ export async function POST(req: NextRequest) {
       .select()
 
     if (itemsError) {
-      console.error('Items insert error:', itemsError)
+      console.error('[memos] Items insert error:', itemsError)
       return NextResponse.json({ error: itemsError.message }, { status: 500 })
     }
 
-    // 각 항목에 임베딩 저장 (백그라운드)
+    // 4. 임베딩 저장 (백그라운드, 실패해도 무방)
     if (savedItems) {
       Promise.allSettled(
         savedItems.map(async (savedItem, idx) => {
-          const itemText = items[idx].content
-          const embedding = await generateEmbedding(itemText)
-          await supabase
-            .from('items')
-            .update({ embedding })
-            .eq('id', savedItem.id)
+          try {
+            const embedding = await generateEmbedding(items[idx].content)
+            await supabase.from('items').update({ embedding }).eq('id', savedItem.id)
+          } catch (e) {
+            console.error(`[memos] Embedding failed for item ${savedItem.id}:`, e)
+          }
         })
       )
     }

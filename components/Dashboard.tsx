@@ -212,6 +212,7 @@ export default function Dashboard() {
               fetchItems()
               showToast(`✅ ${count}개 항목으로 정리됐습니다`)
             }}
+            onError={(msg) => showToast(`❌ ${msg}`)}
           />
           <button
             onClick={() => setShowInput(true)}
