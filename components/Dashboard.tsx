@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase'
 import ItemCard from './ItemCard'
 import MemoInput from './MemoInput'
 import BrainPanel from './BrainPanel'
+import MemoHistory from './MemoHistory'
+import PatternAlerts from './PatternAlerts'
 
 const SECTIONS: { context: Context; label: string; icon: string }[] = [
   { context: 'work', label: '업무', icon: '💼' },
@@ -122,17 +124,23 @@ export default function Dashboard() {
             <h1 className="text-lg font-bold text-gray-900 leading-none">Lumvo</h1>
             <p className="text-xs text-gray-400 mt-0.5">개인 AI 비서</p>
           </div>
-          {pendingTodos > 0 && (
-            <span className="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-              할 일 {pendingTodos}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            <MemoHistory />
+            {pendingTodos > 0 && (
+              <span className="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                할 일 {pendingTodos}
+              </span>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
         {/* AI 브레인 */}
         <BrainPanel />
+
+        {/* 반복 패턴 알림 */}
+        <PatternAlerts />
 
         {/* 필터 탭 */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
