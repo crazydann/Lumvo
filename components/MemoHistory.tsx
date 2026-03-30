@@ -37,13 +37,13 @@ export default function MemoHistory() {
     if (mins < 60) return `${mins}분 전`
     if (hours < 24) return `${hours}시간 전`
     if (days < 7) return `${days}일 전`
-    return d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
+    return d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', timeZone: 'Asia/Seoul' })
   }
 
   // 날짜별 그룹핑
   const grouped = memos.reduce<Record<string, Memo[]>>((acc, memo) => {
     const date = new Date(memo.created_at).toLocaleDateString('ko-KR', {
-      year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
+      year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul',
     })
     acc[date] = acc[date] ? [...acc[date], memo] : [memo]
     return acc

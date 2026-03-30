@@ -51,6 +51,7 @@ export default function ItemCard({ item, onToggle }: Props) {
           <p className="text-xs text-gray-400 mt-0.5">
             {new Date(item.due_date).toLocaleString('ko-KR', {
               month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+              timeZone: 'Asia/Seoul',
             })}
           </p>
         )}
