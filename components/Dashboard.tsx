@@ -9,6 +9,7 @@ import BrainPanel from './BrainPanel'
 import MemoHistory from './MemoHistory'
 import PatternAlerts from './PatternAlerts'
 import QuickVoiceMemo from './QuickVoiceMemo'
+import RelatedMemos from './RelatedMemos'
 
 const SECTIONS: { context: Context; label: string; icon: string }[] = [
   { context: 'work', label: '업무', icon: '💼' },
@@ -29,6 +30,10 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [showInput, setShowInput] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [memoSaveCount, setMemoSaveCount] = useState(0)
+  const [lastMemoText, setLastMemoText] = useState<string | null>(null)
+  const [lastMemoItemIds, setLastMemoItemIds] = useState<string[]>([])
+  const [showRelated, setShowRelated] = useState(false)
   const [pullY, setPullY] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const touchStartY = useRef(0)
@@ -88,6 +93,10 @@ export default function Dashboard() {
     const data = await res.json()
     fetchItems()
     setShowInput(false)
+    setMemoSaveCount((c) => c + 1)
+    setLastMemoText(text)
+    setLastMemoItemIds(data.itemIds ?? [])
+    setShowRelated(true)
     showToast(`✅ ${data.itemCount ?? 0}개 항목으로 정리됐습니다`)
   }
 
@@ -138,10 +147,19 @@ export default function Dashboard() {
 
       <main className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
         {/* AI 브레인 */}
-        <BrainPanel />
+        <BrainPanel refreshTrigger={memoSaveCount} />
 
         {/* 반복 패턴 알림 */}
         <PatternAlerts />
+
+        {/* 관련 과거 메모 */}
+        {showRelated && lastMemoText && (
+          <RelatedMemos
+            memoText={lastMemoText}
+            newItemIds={lastMemoItemIds}
+            onDismiss={() => setShowRelated(false)}
+          />
+        )}
 
         {/* 필터 탭 */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
@@ -208,8 +226,12 @@ export default function Dashboard() {
       {!showInput && (
         <div className="fixed bottom-6 right-6 z-30 flex flex-col items-center gap-3">
           <QuickVoiceMemo
-            onSaved={(count) => {
+            onSaved={(count, text, itemIds) => {
               fetchItems()
+              setMemoSaveCount((c) => c + 1)
+              setLastMemoText(text)
+              setLastMemoItemIds(itemIds)
+              setShowRelated(true)
               showToast(`✅ ${count}개 항목으로 정리됐습니다`)
             }}
             onError={(msg) => showToast(`❌ ${msg}`)}

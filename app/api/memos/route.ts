@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. 항목 저장
+  let savedItemIds: string[] = []
   if (items.length > 0) {
     const itemsToInsert = items.map((item) => ({
       memo_id: memo.id,
@@ -111,8 +112,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: itemsError.message }, { status: 500 })
     }
 
-    // 4. 임베딩 저장 (백그라운드, 실패해도 무방)
     if (savedItems) {
+      savedItemIds = savedItems.map((s) => s.id)
+
+      // 4. 임베딩 저장 (백그라운드, 실패해도 무방)
       Promise.allSettled(
         savedItems.map(async (savedItem, idx) => {
           try {
@@ -126,5 +129,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ memo, itemCount: items.length })
+  return NextResponse.json({ memo, itemCount: items.length, itemIds: savedItemIds })
 }

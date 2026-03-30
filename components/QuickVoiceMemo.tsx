@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 
 interface Props {
-  onSaved: (itemCount: number) => void
+  onSaved: (itemCount: number, text: string, itemIds: string[]) => void
   onError?: (msg: string) => void
 }
 
@@ -79,7 +79,7 @@ export default function QuickVoiceMemo({ onSaved, onError }: Props) {
 
           const data = await memoRes.json()
           console.log(`[QuickVoiceMemo] Saved with ${data.itemCount} items`)
-          onSaved(data.itemCount ?? 0)
+          onSaved(data.itemCount ?? 0, text, data.itemIds ?? [])
         } catch (e) {
           console.error('[QuickVoiceMemo] Error:', e)
           onError?.((e as Error).message ?? '저장 실패')
