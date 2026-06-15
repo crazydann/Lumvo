@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { openai } from '@/lib/openai'
 import { supabase } from '@/lib/supabase'
 import { AnalysisResult } from '@/lib/types'
+import { verifyToken, sanitizeItem, LIMITS } from '@/lib/api-security'
 
 // Siri Shortcut / Apple Watch 에서 메모를 전송하는 전용 엔드포인트
 // 간단한 토큰 인증으로 보호됨
@@ -27,9 +28,9 @@ const SYSTEM_PROMPT = `당신은 개인 비서입니다. 사용자의 메모를 
 }`
 
 export async function POST(req: NextRequest) {
-  // 토큰 인증
+  // 타이밍 공격 방지를 위한 상수 시간 토큰 비교
   const token = req.headers.get('x-api-token') ?? req.nextUrl.searchParams.get('token')
-  if (token !== process.env.SHORTCUT_API_TOKEN) {
+  if (!verifyToken(token)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -38,14 +39,17 @@ export async function POST(req: NextRequest) {
 
   if (contentType.includes('application/json')) {
     const body = await req.json()
-    text = body.text ?? ''
+    text = typeof body.text === 'string' ? body.text : ''
   } else {
-    // Shortcuts에서 plain text로 보내는 경우
     text = await req.text()
   }
 
   if (!text.trim()) {
     return NextResponse.json({ error: 'No text provided' }, { status: 400 })
+  }
+
+  if (Buffer.byteLength(text, 'utf8') > LIMITS.MAX_TEXT_BYTES) {
+    return NextResponse.json({ error: 'Text too large' }, { status: 413 })
   }
 
   // AI 분석
@@ -67,15 +71,12 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  // 항목 저장
+  // 항목 저장 (AI 출력값 sanitize 후 저장)
   if (memo && analysis.items.length > 0) {
     await supabase.from('items').insert(
       analysis.items.map((item) => ({
         memo_id: memo.id,
-        context: item.context,
-        type: item.type,
-        content: item.content,
-        due_date: item.due_date ?? null,
+        ...sanitizeItem(item),
       }))
     )
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { openai } from '@/lib/openai'
+import { LIMITS } from '@/lib/api-security'
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,6 +9,10 @@ export async function POST(req: NextRequest) {
 
     if (!audioFile) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 })
+    }
+
+    if (audioFile.size > LIMITS.MAX_AUDIO_BYTES) {
+      return NextResponse.json({ error: 'Audio file too large (max 10MB)' }, { status: 413 })
     }
 
     console.log(`[transcribe] Received audio: ${audioFile.name}, size: ${audioFile.size} bytes`)

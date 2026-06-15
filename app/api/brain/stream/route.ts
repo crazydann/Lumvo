@@ -3,6 +3,7 @@ import { openai } from '@/lib/openai'
 import { supabase } from '@/lib/supabase'
 import { generateEmbedding, searchSimilarItems } from '@/lib/embeddings'
 import { getAllMemory, upsertMemory } from '@/lib/memory'
+import { LIMITS } from '@/lib/api-security'
 
 function encode(text: string) {
   return new TextEncoder().encode(`data: ${text}\n\n`)
@@ -72,6 +73,9 @@ export async function POST(req: NextRequest) {
   const { query } = await req.json()
   if (!query?.trim()) {
     return new Response('No query', { status: 400 })
+  }
+  if (Buffer.byteLength(String(query), 'utf8') > LIMITS.MAX_QUERY_BYTES) {
+    return new Response('Query too large', { status: 413 })
   }
   const prompt = await buildQueryPrompt(query)
   return streamResponse(prompt.system, prompt.user)

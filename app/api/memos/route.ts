@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { openai } from '@/lib/openai'
 import { supabase } from '@/lib/supabase'
 import { generateEmbedding } from '@/lib/embeddings'
+import { sanitizeItem, LIMITS } from '@/lib/api-security'
 
 const SYSTEM_PROMPT = `당신은 개인 비서입니다. 사용자의 메모를 분석하여 JSON 형식으로 정리해 주세요.
 
@@ -56,6 +57,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No text provided' }, { status: 400 })
   }
 
+  if (Buffer.byteLength(String(raw_text), 'utf8') > LIMITS.MAX_TEXT_BYTES) {
+    return NextResponse.json({ error: 'Text too large' }, { status: 413 })
+  }
+
   // 1. AI 분석
   let items: AnalyzedItem[] = []
   try {
@@ -88,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   if (memoError) {
     console.error('[memos] Memo insert error:', memoError)
-    return NextResponse.json({ error: memoError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to save memo' }, { status: 500 })
   }
 
   // 3. 항목 저장
@@ -96,10 +101,7 @@ export async function POST(req: NextRequest) {
   if (items.length > 0) {
     const itemsToInsert = items.map((item) => ({
       memo_id: memo.id,
-      context: item.context,
-      type: item.type,
-      content: item.content,
-      due_date: item.due_date ?? null,
+      ...sanitizeItem(item),
     }))
 
     const { data: savedItems, error: itemsError } = await supabase
@@ -109,7 +111,7 @@ export async function POST(req: NextRequest) {
 
     if (itemsError) {
       console.error('[memos] Items insert error:', itemsError)
-      return NextResponse.json({ error: itemsError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to save items' }, { status: 500 })
     }
 
     if (savedItems) {
